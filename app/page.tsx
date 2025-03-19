@@ -1,101 +1,156 @@
-import Image from "next/image";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client"
+
+import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { useRouter } from "next/navigation"
+import Header from "@/components/ui/header"
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const router = useRouter()
+  const [workspaces, setWorkspaces] = useState<string[]>([])
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    // Load theme
+    const theme = localStorage.getItem("theme")
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark")
+      setIsDarkMode(true)
+    }
+
+    // Load workspaces
+    const savedWorkspaces = JSON.parse(localStorage.getItem("workspaces") || "[]")
+    setWorkspaces(savedWorkspaces)
+  }, [])
+
+ 
+  const [url, setUrl] = useState("")
+  const [description, setDescription] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [results, setResults] = useState<{ product: string; price: string }[]>([])
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  // Load theme preference from localStorage
+  useEffect(() => {
+    const theme = localStorage.getItem("theme")
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark")
+      setIsDarkMode(true)
+    }
+  }, [])
+
+  // Toggle theme function
+
+  const handleScrape = async () => {
+    setLoading(true)
+    // Simulated API call - replace with actual implementation
+    setTimeout(() => {
+      setResults([
+        { product: "Rev 1.0 Utility Waist Pouch (Deep Blue)", price: "₹250" },
+        { product: "Rev 1.0 Utility Waist Pouch (Nardo Grey)", price: "₹250" },
+        { product: "Flying Weebee", price: "₹420" },
+        { product: "Myth of Asia", price: "₹420" },
+        { product: "WIZMAN X SEEDSTORE (PACK OF 3)", price: "₹1,111" },
+      ])
+      setLoading(false)
+    }, 1500)
+  }
+
+  return (
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Accent color blobs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl dark:bg-blue-500/10" />
+        <div className="absolute -bottom-40 right-1/3 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl dark:bg-purple-500/10" />
+      </div>
+
+      {/* Header */}
+      <Header/>
+
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8 max-w-3xl relative">
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500">
+              AI Web Scraper
+            </h1>
+            <p className="text-muted-foreground text-center">
+              Enter a website URL and describe what data you want to extract
+            </p>
+          </div>
+
+          <div className="space-y-4 backdrop-blur-md bg-card/50 p-6 rounded-xl border border-border/50 shadow-lg">
+            <div className="space-y-2">
+              <label htmlFor="url" className="text-sm font-medium">
+                Website URL
+              </label>
+              <Input
+                id="url"
+                placeholder="https://example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="bg-background/50 backdrop-blur-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="description" className="text-sm font-medium">
+                Describe what you want to parse
+              </label>
+              <Textarea
+                id="description"
+                placeholder="e.g., Extract all product names and prices"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px] bg-background/50 backdrop-blur-sm"
+              />
+            </div>
+
+            <Button 
+              className="w-full bg-primary/90 hover:bg-primary/100 backdrop-blur-sm"
+              onClick={handleScrape}
+              disabled={loading}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Scraping..." : "Scrape Website"}
+            </Button>
+          </div>
+
+          {results.length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-md shadow-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-primary/5">
+                    <TableHead>Product Name</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.map((item, index) => (
+                    <TableRow key={index} className="hover:bg-primary/5">
+                      <TableCell>{item.product}</TableCell>
+                      <TableCell className="text-right">{item.price}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
