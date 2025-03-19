@@ -45,6 +45,11 @@ export default function WorkspacePage() {
         }, 1500)
     }
 
+    const handleSave = () => {
+        // This will be implemented later
+        console.log("Save clicked - Implement saving logic here");
+    }
+
     return (
         <div className="min-h-screen bg-background relative overflow-hidden">
             {/* Accent color blobs */}
@@ -96,14 +101,30 @@ export default function WorkspacePage() {
                             />
                         </div>
 
-                        <Button 
-                            className="w-full bg-primary/90 hover:bg-primary/100 backdrop-blur-sm"
-                            onClick={handleScrape}
-                            disabled={loading}
-                        >
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {loading ? "Scraping..." : "Scrape Website"}
-                        </Button>
+                        {/* Scrape & Save Buttons Container */}
+                        <div className="flex justify-between items-center mt-2">
+                            {/* Scrape Button */}
+                            <Button
+                                className="flex-1 bg-primary/90 hover:bg-primary/100 backdrop-blur-sm"
+                                onClick={handleScrape}
+                                disabled={loading}
+                            >
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {loading ? "Scraping..." : "Scrape Website"}
+                            </Button>
+
+                            {/* Save Button - Smaller & Aligned */}
+                            <Button
+                                className="ml-2 px-4 py-2 text-white bg-white/0 border border-white 
+               hover:bg-white/10 rounded-lg"
+                                onClick={handleSave}
+                            >
+                                Save
+                            </Button>
+
+                        </div>
+
+
                     </div>
 
                     {results.length > 0 && (
