@@ -245,7 +245,7 @@ export default function Header() {
         </div>
 
         {/* Right Section (Workspaces + Theme Toggle + User Avatar) */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {/* Theme Toggle */}
           <Button variant="ghost" onClick={toggleTheme} className="p-2">
             {isDarkMode ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-gray-700" />}
