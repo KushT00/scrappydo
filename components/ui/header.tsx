@@ -92,8 +92,7 @@ export default function Header() {
       setUser(session?.user ?? null); // Update user when auth state changes
       
       if (session?.user) {
-        console.log("Auth event:", event);
-        console.log("User logged in:", session.user.email, session.user.user_metadata.avatar_url);
+       
         loadUserWorkspaces(session.user.id); // Load workspaces when user logs in
         
         // Only redirect to home if this is an actual sign-in event, not just a session check
