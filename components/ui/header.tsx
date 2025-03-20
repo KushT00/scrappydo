@@ -95,10 +95,7 @@ export default function Header() {
        
         loadUserWorkspaces(session.user.id); // Load workspaces when user logs in
         
-        // Only redirect to home if this is an actual sign-in event, not just a session check
-        if (event === 'SIGNED_IN') {
-          router.push("/"); // Redirect to home page only after sign in
-        }
+        
       } else if (event === 'SIGNED_OUT') {
         // Clear workspaces if user logs out
         setWorkspaces([]);

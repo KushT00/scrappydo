@@ -17,6 +17,8 @@ const Index = () => {
     const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
     const [isScraped, setIsScraped] = useState(false);
 
+
+    
     // Check scrape status on page load
     useEffect(() => {
         const checkScrapeStatus = async () => {
