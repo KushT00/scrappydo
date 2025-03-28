@@ -4,9 +4,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Send } from "lucide-react";
+import { Calendar, Clock, Loader2, Send } from "lucide-react";
 import Header from "@/components/ui/header";
 import { usePathname } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import ScrapingSchedule from "./schedule";
+import EmailTrigger from "../triggers";
+
+
 
 const Index = () => {
     const [url, setUrl] = useState("");
@@ -18,7 +24,7 @@ const Index = () => {
     const [isScraped, setIsScraped] = useState(false);
 
 
-    
+
     // Check scrape status on page load
     useEffect(() => {
         const checkScrapeStatus = async () => {
@@ -26,7 +32,7 @@ const Index = () => {
                 const response = await fetch("http://localhost:8000/scrape/status");
                 const data = await response.json();
                 setIsScraped(data.has_content);
-                
+
                 if (data.has_content) {
                     setChatMessages([
                         { role: "system", content: "Website already scraped! You can ask questions now." }
@@ -36,7 +42,7 @@ const Index = () => {
                 console.error("Error checking scrape status:", error);
             }
         };
-        
+
         checkScrapeStatus();
     }, []);
 
@@ -51,18 +57,18 @@ const Index = () => {
     const handleScrape = async () => {
         if (!url) return;
         setIsScraping(true);
-    
+
         try {
             const response = await fetch("http://localhost:8000/scrape", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url }),
             });
-    
+
             const data = await response.json();
             setIsScraping(false);
             setIsScraped(true);
-    
+
             setChatMessages([
                 { role: "system", content: "Website scraped successfully! You can ask questions now." },
                 { role: "system", content: `Preview: ${data.content.slice(0, 200)}...` }
@@ -70,40 +76,40 @@ const Index = () => {
         } catch (error) {
             console.error("Scraping error:", error);
             setIsScraping(false);
-            setChatMessages(prev => [...prev, { 
-                role: "system", 
-                content: "Error scraping the website. Please check the URL and try again." 
+            setChatMessages(prev => [...prev, {
+                role: "system",
+                content: "Error scraping the website. Please check the URL and try again."
             }]);
         }
     };
-    
+
     const handleSendPrompt = async () => {
         if (!userPrompt.trim()) return;
-        
+
         // Add user message to chat
         setChatMessages(prev => [...prev, { role: "user", content: userPrompt }]);
         setLoading(true);
-    
+
         try {
             const response = await fetch("http://localhost:8000/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     user_prompt: userPrompt,
                     use_scraped_content: true // Make sure to use the scraped content
                 }),
             });
-    
+
             const data = await response.json();
             setChatMessages(prev => [...prev, { role: "assistant", content: data.response }]);
         } catch (error) {
             console.error("Chat API error:", error);
-            setChatMessages(prev => [...prev, { 
-                role: "system", 
-                content: "Error communicating with the AI. Please try again." 
+            setChatMessages(prev => [...prev, {
+                role: "system",
+                content: "Error communicating with the AI. Please try again."
             }]);
         }
-        
+
         setLoading(false);
         setUserPrompt("");
     };
@@ -119,11 +125,11 @@ const Index = () => {
             console.error("Error clearing content:", error);
         }
     };
-    
+
     const pathname = usePathname();
     const parts = pathname?.split("/") || [];
     const workspaceName = parts[2] || "Workspace"; // Extracts "News" from "/workspace/News"
-    
+
     return (
         <div className="min-h-screen bg-background relative overflow-hidden">
             {/* Accent color blobs */}
@@ -179,7 +185,7 @@ const Index = () => {
                                 "Scrape Website"
                             )}
                         </Button>
-                        
+
                         {isScraped && (
                             <Button
                                 variant="outline"
@@ -189,72 +195,96 @@ const Index = () => {
                                 Clear Scraped Content
                             </Button>
                         )}
+                        <ScrapingSchedule
+                            onSchedule={(scheduleData) => {
+                                console.log('Scheduled Scraping:', scheduleData);
+                            }}
+                        />
                     </div>
 
-                    {/* Right side - Chat interface */}
-                    <div className="col-span-2 backdrop-blur-md bg-card/50 p-6 rounded-xl border border-border/50 shadow-lg space-y-4 h-[600px] flex flex-col">
-                        <h2 className="text-xl font-semibold">
-                            Chat with Website Content {isScraped && <span className="text-sm text-green-500 ml-2">(Content Loaded)</span>}
-                        </h2>
+                    {/* Right side - Chat interface and EmailTrigger below it */}
+                    <div className="col-span-2 flex flex-col space-y-4">
+                        <div className="backdrop-blur-md bg-card/50 p-6 rounded-xl border border-border/50 shadow-lg space-y-4 h-[600px] flex flex-col">
+                            <h2 className="text-xl font-semibold">
+                                Chat with Website Content {isScraped && <span className="text-sm text-green-500 ml-2">(Content Loaded)</span>}
+                            </h2>
 
-                        <div className="flex-grow overflow-auto space-y-4 py-2 custom-scrollbar">
-                            {chatMessages.length === 0 && !isScraped ? (
-                                <p className="text-muted-foreground text-center">
-                                    Scrape a website first, then chat with the content.
-                                </p>
-                            ) : (
-                                chatMessages.map((message, index) => (
-                                    <div
-                                        key={index}
-                                        className={`${
-                                            message.role === "user"
+                            <div className="flex-grow overflow-auto space-y-4 py-2 custom-scrollbar">
+                                {chatMessages.length === 0 && !isScraped ? (
+                                    <p className="text-muted-foreground text-center">
+                                        Scrape a website first, then chat with the content.
+                                    </p>
+                                ) : (
+                                    chatMessages.map((message, index) => (
+                                        <div
+                                            key={index}
+                                            className={`${message.role === "user"
                                                 ? "ml-auto bg-primary/20 backdrop-blur-md"
                                                 : message.role === "system"
-                                                ? "mx-auto bg-muted/50 backdrop-blur-md text-center"
-                                                : "mr-auto bg-card backdrop-blur-md border border-border/50"
-                                        } p-3 rounded-xl max-w-[80%]`}
-                                    >
-                                        <p className="text-sm">{message.content}</p>
+                                                    ? "mx-auto bg-muted/50 backdrop-blur-md text-center"
+                                                    : "mr-auto bg-card backdrop-blur-md border border-border/50"
+                                                } p-3 rounded-xl max-w-[80%]`}
+                                        >
+                                            {message.content.includes("|") ? (
+                                                <div className="overflow-auto">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]} >
+                                                        {message.content}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm">{message.content}</p>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                                {loading && (
+                                    <div className="flex justify-center">
+                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
                                     </div>
-                                ))
-                            )}
-                            {loading && (
-                                <div className="flex justify-center">
-                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                </div>
-                            )}
+                                )}
+                            </div>
+
+                            <div className="relative">
+                                <Textarea
+                                    placeholder={isScraped ? "Ask about the scraped website..." : "Scrape a website first..."}
+                                    value={userPrompt}
+                                    onChange={(e) => setUserPrompt(e.target.value)}
+                                    className="resize-none pr-12 bg-background/50 backdrop-blur-sm"
+                                    rows={3}
+                                    disabled={!isScraped || loading}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendPrompt();
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    className="absolute right-2 bottom-2 p-2 h-8 w-8"
+                                    onClick={handleSendPrompt}
+                                    disabled={!isScraped || !userPrompt.trim() || loading}
+                                    variant="ghost"
+                                >
+                                    {loading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="relative">
-                            <Textarea
-                                placeholder={isScraped ? "Ask about the scraped website..." : "Scrape a website first..."}
-                                value={userPrompt}
-                                onChange={(e) => setUserPrompt(e.target.value)}
-                                className="resize-none pr-12 bg-background/50 backdrop-blur-sm"
-                                rows={3}
-                                disabled={!isScraped || loading}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSendPrompt();
-                                    }
+                        {/* EmailTrigger component below the chat interface */}
+                        <div className=" bg-card/50  rounded-xl  shadow-lg">
+                            <EmailTrigger
+                                onTriggerSetup={(triggerConfig) => {
+                                    console.log('Email Trigger Configured:', triggerConfig);
                                 }}
                             />
-                            <Button
-                                className="absolute right-2 bottom-2 p-2 h-8 w-8"
-                                onClick={handleSendPrompt}
-                                disabled={!isScraped || !userPrompt.trim() || loading}
-                                variant="ghost"
-                            >
-                                {loading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="h-4 w-4" />
-                                )}
-                            </Button>
                         </div>
                     </div>
                 </div>
+
             </main>
         </div>
     );

@@ -12,7 +12,7 @@ from groq import Groq
 from typing import Optional
 
 # Set up Groq API client
-client = Groq(api_key="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")
+client = Groq(api_key="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")
 
 # FastAPI app
 app = FastAPI(title="Website Scraper API")
