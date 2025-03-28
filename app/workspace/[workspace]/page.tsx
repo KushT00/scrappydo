@@ -157,7 +157,8 @@ const Index = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
                     {/* Left side - URL input and scrape button */}
-                    <div className="col-span-1 backdrop-blur-md bg-card/50 p-4 rounded-xl border border-border/50 shadow-lg space-y-4 flex flex-col self-start">
+                    <div className="w-full  col-span-1 backdrop-blur-md bg-card/50 p-4 rounded-xl border border-border/50 shadow-lg space-y-4 flex flex-col self-start">
+
                         <h2 className="text-lg font-semibold">Website Scraper</h2>
 
                         <div className="space-y-2">
