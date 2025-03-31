@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState, useEffect } from "react";
@@ -11,8 +12,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ScrapingSchedule from "./schedule";
 import EmailTrigger from "../triggers";
+import { createClient } from "@supabase/supabase-js";
 
-
+// Initialize Supabase client (you'll need to add your credentials)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const Index = () => {
     const [url, setUrl] = useState("");
@@ -22,10 +27,47 @@ const Index = () => {
     const [userPrompt, setUserPrompt] = useState("");
     const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
     const [isScraped, setIsScraped] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
+    const [storageError, setStorageError] = useState<string | null>(null);
+
+    // Get the current pathname for workspace name
+    const pathname = usePathname();
+    const parts = pathname?.split("/") || [];
+    const workspaceName = parts[2] || "Workspace"; // Extracts "News" from "/workspace/News"
 
 
 
-    // Check scrape status on page load
+    useEffect(() => {
+        if (url) {
+            console.log("URL updated, triggering handleScrape:", url);
+            handleScrape();
+        }
+    }, [url]);
+    
+    const fetchStoredUrl = async () => {
+        if (!userId) return;
+    
+        try {
+            const path = `${userId}/${workspaceName}/urls.txt`;
+            const { data, error } = await supabase.storage.from('scrappydo').download(path);
+    
+            if (error) {
+                console.log("No stored URL found for this workspace.");
+                return;
+            }
+    
+            if (data) {
+                const storedUrl = await data.text();
+                setUrl(storedUrl.trim()); // Triggers useEffect, which calls handleScrape()
+            }
+        } catch (err) {
+            console.error("Error fetching stored URL:", err);
+        }
+    };
+    
+    
+    
+    // Check scrape status and get user ID on page load
     useEffect(() => {
         const checkScrapeStatus = async () => {
             try {
@@ -43,8 +85,35 @@ const Index = () => {
             }
         };
 
+
         checkScrapeStatus();
     }, []);
+
+    useEffect(() => {
+        const getCurrentUser = async () => {
+            try {
+                const { data, error } = await supabase.auth.getUser();
+                if (error) {
+                    console.error("Error getting user:", error);
+                    return;
+                }
+                if (data && data.user) {
+                    setUserId(data.user.id);
+                }
+            } catch (error) {
+                console.error("Error checking user:", error);
+            }
+        };
+    
+        getCurrentUser();
+    }, []);
+    
+    useEffect(() => {
+        if (userId) {
+            fetchStoredUrl();
+        }
+    }, [userId, workspaceName]); // Fetch URL when user ID or workspace changes
+    
 
     useEffect(() => {
         const theme = localStorage.getItem("theme");
@@ -54,11 +123,59 @@ const Index = () => {
         }
     }, []);
 
+    // Function to save URL to Supabase storage
+    const saveUrlToStorage = async (urlToSave: string) => {
+        if (!userId) {
+            console.log("No user ID available");
+            setStorageError("User not authenticated. Cannot save URL.");
+            return false;
+        }
+    
+        try {
+            const path = `${userId}/${workspaceName}/urls.txt`;
+    
+            // Overwrite the file with only the new URL
+            const { data, error: uploadError } = await supabase.storage
+                .from('scrappydo')
+                .upload(path, new Blob([urlToSave]), {
+                    upsert: true, // This ensures the file is replaced
+                    contentType: 'text/plain'
+                });
+    
+            if (uploadError) {
+                console.error("Error saving URL to storage:", uploadError);
+                setStorageError(`Failed to save URL to storage: ${uploadError.message}`);
+                return false;
+            }
+    
+            // console.log("URL saved successfully to urls.txt");
+            setStorageError(null);
+            return true;
+        } catch (error) {
+            console.error("Error in saveUrlToStorage:", error);
+            setStorageError(`An error occurred while saving the URL: ${error}`);
+            return false;
+        }
+    };
+    
     const handleScrape = async () => {
+        // console.log("scrapping", url , "this url")
         if (!url) return;
         setIsScraping(true);
 
+        // Wait for userId to be set before proceeding
+        if (!userId) {
+            console.log("Waiting for userId...");
+            while (!userId) {
+                await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+            }
+        }
+
         try {
+            // First save the URL to storage
+            const savedToStorage = await saveUrlToStorage(url);
+
+            // Proceed with scraping
             const response = await fetch("http://localhost:8000/scrape", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -69,10 +186,25 @@ const Index = () => {
             setIsScraping(false);
             setIsScraped(true);
 
-            setChatMessages([
+            const messages = [
                 { role: "system", content: "Website scraped successfully! You can ask questions now." },
                 { role: "system", content: `Preview: ${data.content.slice(0, 200)}...` }
-            ]);
+            ];
+
+            // Add storage status message if applicable
+            // if (savedToStorage) {
+            //     messages.push({
+            //         role: "system",
+            //         content: `URL saved to ${workspaceName} workspace.`
+            //     });
+            // } else if (storageError) {
+            //     messages.push({
+            //         role: "system",
+            //         content: `Note: ${storageError}`
+            //     });
+            // }
+
+            setChatMessages(messages);
         } catch (error) {
             console.error("Scraping error:", error);
             setIsScraping(false);
@@ -80,8 +212,16 @@ const Index = () => {
                 role: "system",
                 content: "Error scraping the website. Please check the URL and try again."
             }]);
+
+            if (storageError) {
+                setChatMessages(prev => [...prev, {
+                    role: "system",
+                    content: `Storage error: ${storageError}`
+                }]);
+            }
         }
     };
+
 
     const handleSendPrompt = async () => {
         if (!userPrompt.trim()) return;
@@ -125,11 +265,6 @@ const Index = () => {
             console.error("Error clearing content:", error);
         }
     };
-
-    const pathname = usePathname();
-    const parts = pathname?.split("/") || [];
-    const workspaceName = parts[2] || "Workspace"; // Extracts "News" from "/workspace/News"
-
     return (
         <div className="min-h-screen bg-background relative overflow-hidden">
             {/* Accent color blobs */}
