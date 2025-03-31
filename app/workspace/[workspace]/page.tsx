@@ -37,12 +37,7 @@ const Index = () => {
 
 
 
-    useEffect(() => {
-        if (url) {
-            console.log("URL updated, triggering handleScrape:", url);
-            handleScrape();
-        }
-    }, [url]);
+
     
     const fetchStoredUrl = async () => {
         if (!userId) return;
@@ -59,6 +54,7 @@ const Index = () => {
             if (data) {
                 const storedUrl = await data.text();
                 setUrl(storedUrl.trim()); // Triggers useEffect, which calls handleScrape()
+                
             }
         } catch (err) {
             console.error("Error fetching stored URL:", err);
