@@ -14,6 +14,12 @@ import remarkGfm from "remark-gfm";
 import ScrapingSchedule from "./schedule";
 import EmailTrigger from "../triggers";
 import { createClient } from "@supabase/supabase-js";
+declare global {
+    interface Window {
+        scrapeTimeoutId?: number;
+    }
+}
+
 
 // Initialize Supabase client (you'll need to add your credentials)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -370,14 +376,12 @@ const Index = () => {
                 day: 'numeric'
             });
 
-            // Add message to chat showing the scheduled time
-            setChatMessages(prev => [...prev, {
-                role: "system",
-                content: `Scraping scheduled for ${formattedDate} at ${scheduleInfo.time} (${scheduleInfo.frequency}).`
-            }]);
-
-            // Set up the schedule and store the timeout ID
-            window.scrapeTimeoutId = setupScheduledScraping(scheduleInfo, url);
+           
+            if ((window as any).scrapeTimeoutId) {
+                clearTimeout((window as any).scrapeTimeoutId);
+            }
+            (window as any).scrapeTimeoutId = setupScheduledScraping(scheduleInfo, url);
+            
         }
     }, [scheduleInfo, url]);
 
