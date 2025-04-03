@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -5,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Clock, Loader2, Send } from "lucide-react";
+import { Calendar, Clock, Download, Loader2, Send } from "lucide-react";
 import Header from "@/components/ui/header";
 import { usePathname } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -29,40 +30,40 @@ const Index = () => {
     const [isScraped, setIsScraped] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
     const [storageError, setStorageError] = useState<string | null>(null);
+    // Add these new state variables near your other useState declarations
+    const [scheduleInfo, setScheduleInfo] = useState<{
+        frequency: string;
+        time: string;
+        startDate: Date;
+    } | null>(null);
 
     // Get the current pathname for workspace name
     const pathname = usePathname();
     const parts = pathname?.split("/") || [];
     const workspaceName = parts[2] || "Workspace"; // Extracts "News" from "/workspace/News"
 
-
-
-
-    
     const fetchStoredUrl = async () => {
         if (!userId) return;
-    
+
         try {
             const path = `${userId}/${workspaceName}/urls.txt`;
             const { data, error } = await supabase.storage.from('scrappydo').download(path);
-    
+
             if (error) {
                 console.log("No stored URL found for this workspace.");
                 return;
             }
-    
+
             if (data) {
                 const storedUrl = await data.text();
                 setUrl(storedUrl.trim()); // Triggers useEffect, which calls handleScrape()
-                
+
             }
         } catch (err) {
             console.error("Error fetching stored URL:", err);
         }
     };
-    
-    
-    
+
     // Check scrape status and get user ID on page load
     useEffect(() => {
         const checkScrapeStatus = async () => {
@@ -80,7 +81,6 @@ const Index = () => {
                 console.error("Error checking scrape status:", error);
             }
         };
-
 
         checkScrapeStatus();
     }, []);
@@ -100,16 +100,15 @@ const Index = () => {
                 console.error("Error checking user:", error);
             }
         };
-    
+
         getCurrentUser();
     }, []);
-    
+
     useEffect(() => {
         if (userId) {
             fetchStoredUrl();
         }
     }, [userId, workspaceName]); // Fetch URL when user ID or workspace changes
-    
 
     useEffect(() => {
         const theme = localStorage.getItem("theme");
@@ -126,10 +125,10 @@ const Index = () => {
             setStorageError("User not authenticated. Cannot save URL.");
             return false;
         }
-    
+
         try {
             const path = `${userId}/${workspaceName}/urls.txt`;
-    
+
             // Overwrite the file with only the new URL
             const { data, error: uploadError } = await supabase.storage
                 .from('scrappydo')
@@ -137,13 +136,13 @@ const Index = () => {
                     upsert: true, // This ensures the file is replaced
                     contentType: 'text/plain'
                 });
-    
+
             if (uploadError) {
                 console.error("Error saving URL to storage:", uploadError);
                 setStorageError(`Failed to save URL to storage: ${uploadError.message}`);
                 return false;
             }
-    
+
             // console.log("URL saved successfully to urls.txt");
             setStorageError(null);
             return true;
@@ -153,7 +152,7 @@ const Index = () => {
             return false;
         }
     };
-    
+
     const handleScrape = async () => {
         // console.log("scrapping", url , "this url")
         if (!url) return;
@@ -261,6 +260,151 @@ const Index = () => {
             console.error("Error clearing content:", error);
         }
     };
+
+    // New function to export chat to CSV
+    const exportChatToCSV = () => {
+        // Skip if no messages to export
+        if (chatMessages.length === 0) return;
+
+        // Create CSV content
+        let csvContent = "role,content\n";
+
+        // Add each message to CSV
+        chatMessages.forEach(message => {
+            // Escape quotes in content and wrap in quotes
+            const formattedContent = `"${message.content.replace(/"/g, '""')}"`;
+            csvContent += `${message.role},${formattedContent}\n`;
+        });
+
+        // Create a Blob with the CSV content
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+        // Create a download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${workspaceName}-chat-export.csv`);
+
+        // Append to document, trigger click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+
+    // Add this new function to your Index component
+    const setupScheduledScraping = (scheduleInfo: { frequency: any; time: any; startDate: any; }, url: string) => {
+        if (!scheduleInfo || !url) return;
+
+        // Function to calculate time until next scheduled scrape
+        const calculateTimeUntilNextScrape = () => {
+            const now = new Date();
+            const targetDate = new Date(scheduleInfo.startDate);
+
+            // Extract hours and minutes from the time string (HH:MM format)
+            const [hours, minutes] = scheduleInfo.time.split(':').map(Number);
+
+            // Set the target time
+            targetDate.setHours(hours, minutes, 0, 0);
+
+            // If the target time is in the past, adjust based on frequency
+            if (targetDate < now) {
+                if (scheduleInfo.frequency === 'daily') {
+                    // Move to next day
+                    targetDate.setDate(targetDate.getDate() + 1);
+                } else if (scheduleInfo.frequency === 'weekly') {
+                    // Move to next week
+                    targetDate.setDate(targetDate.getDate() + 7);
+                } else if (scheduleInfo.frequency === 'monthly') {
+                    // Move to next month
+                    targetDate.setMonth(targetDate.getMonth() + 1);
+                } else {
+                    // One-time but already passed, return null
+                    return null;
+                }
+            }
+
+            // Calculate milliseconds until the target time
+            return targetDate.getTime() - now.getTime();
+        };
+
+        // Function to perform the scheduled scrape
+        const performScheduledScrape = () => {
+            console.log(`Executing scheduled scrape for URL: ${url}`);
+            handleScrape(); // Execute the scrape
+
+            // If it's a recurring schedule, set up the next one
+            if (scheduleInfo.frequency !== 'once') {
+                const nextTimeout = calculateTimeUntilNextScrape();
+                if (nextTimeout !== null) {
+                    setTimeout(performScheduledScrape, nextTimeout);
+                }
+            }
+        };
+
+        // Calculate initial timeout and schedule first scrape
+        const initialTimeout = calculateTimeUntilNextScrape();
+        if (initialTimeout !== null) {
+            // Store the timeout ID to clear it if needed
+            const timeoutId = setTimeout(performScheduledScrape, initialTimeout);
+            return timeoutId;
+        }
+
+        return null;
+    };
+
+
+    // Add a useEffect to set up the scheduled scraping whenever scheduleInfo changes
+    useEffect(() => {
+        // Clear any existing timeout to avoid duplicate schedules
+        if (window.scrapeTimeoutId) {
+            clearTimeout(window.scrapeTimeoutId);
+        }
+
+        // Set up the new schedule if we have the necessary info
+        if (scheduleInfo && url) {
+            // Format the scheduled time for user feedback
+            const formattedDate = scheduleInfo.startDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            // Add message to chat showing the scheduled time
+            setChatMessages(prev => [...prev, {
+                role: "system",
+                content: `Scraping scheduled for ${formattedDate} at ${scheduleInfo.time} (${scheduleInfo.frequency}).`
+            }]);
+
+            // Set up the schedule and store the timeout ID
+            window.scrapeTimeoutId = setupScheduledScraping(scheduleInfo, url);
+        }
+    }, [scheduleInfo, url]);
+
+    // Add this effect to restore schedules from localStorage when the component mounts
+    useEffect(() => {
+        if (userId && workspaceName) {
+            const key = `scrape-schedule-${userId}-${workspaceName}`;
+            const savedSchedule = localStorage.getItem(key);
+
+            if (savedSchedule) {
+                try {
+                    const parsedSchedule = JSON.parse(savedSchedule);
+                    setScheduleInfo({
+                        ...parsedSchedule,
+                        startDate: new Date(parsedSchedule.startDate)
+                    });
+
+                    if (parsedSchedule.url) {
+                        setUrl(parsedSchedule.url);
+                    }
+                } catch (error) {
+                    console.error("Error restoring saved schedule:", error);
+                }
+            }
+        }
+    }, [userId, workspaceName]);
+
     return (
         <div className="min-h-screen bg-background relative overflow-hidden">
             {/* Accent color blobs */}
@@ -276,13 +420,17 @@ const Index = () => {
             {/* Main Content */}
             <main className="container mx-auto py-8 px-4 relative">
                 <div className="space-y-6 mb-8">
-                    <div className="text-left"> {/* Left-aligned text */}
-                        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500">
-                            {workspaceName}
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Scrape websites and chat with the content using AI
-                        </p>
+                    <div className="flex justify-between items-center"> {/* Changed to flex container with space between */}
+                        <div>
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500">
+                                {workspaceName}
+                            </h1>
+                            <p className="text-muted-foreground">
+                                Scrape websites and chat with the content using AI
+                            </p>
+                        </div>
+
+
                     </div>
                 </div>
 
@@ -327,9 +475,46 @@ const Index = () => {
                                 Clear Scraped Content
                             </Button>
                         )}
+                        {/* Export button */}
+                        <Button
+                            onClick={exportChatToCSV}
+                            variant="outline"
+                            className="w-full"
+                            disabled={chatMessages.length === 0}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export CSV
+                        </Button>
                         <ScrapingSchedule
                             onSchedule={(scheduleData) => {
-                                console.log('Scheduled Scraping:', scheduleData);
+                                // Store the schedule data in state
+                                setScheduleInfo(scheduleData);
+
+                                // Add a message to the chat to inform the user
+                                const formattedDate = scheduleData.startDate.toLocaleDateString('en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric'
+                                });
+
+
+
+                                // Log for debugging
+                                console.log('Scraping scheduled:', {
+                                    url,
+                                    ...scheduleData,
+                                    formattedStartDate: scheduleData.startDate.toLocaleString(),
+                                });
+
+                                // Save to localStorage for persistence across page refreshes
+                                if (userId) {
+                                    const key = `scrape-schedule-${userId}-${workspaceName}`;
+                                    localStorage.setItem(key, JSON.stringify({
+                                        url,
+                                        ...scheduleData,
+                                        startDate: scheduleData.startDate.toISOString()
+                                    }));
+                                }
                             }}
                         />
                     </div>
@@ -413,6 +598,19 @@ const Index = () => {
                                     console.log('Email Trigger Configured:', triggerConfig);
                                 }}
                             />
+                            {scheduleInfo && (
+                                <div className=" p-3  text-sm text-center flex items-center justify-center space-x-2">
+                                    <Calendar className="h-4 w-4 text-primary" />
+                                    <Clock className="h-4 w-4 text-primary" />
+                                    <span>
+                                        Scraping scheduled: {scheduleInfo.startDate.toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric'
+                                        })} at {scheduleInfo.time} ({scheduleInfo.frequency})
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
