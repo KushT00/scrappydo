@@ -3,6 +3,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState, useEffect } from "react";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -303,6 +305,7 @@ const Index = () => {
 
 
     // Add this new function to your Index component
+    // Add this new function to your Index component
     const setupScheduledScraping = (scheduleInfo: { frequency: any; time: any; startDate: any; }, url: string) => {
         if (!scheduleInfo || !url) return;
 
@@ -384,6 +387,17 @@ const Index = () => {
 
         return null;
     };
+
+    // Function to handle the schedule button click
+    // Add a useEffect to set up the scheduled API calls when component mounts or dependencies change
+    useEffect(() => {
+        // Clean up function to clear timeout when component unmounts
+        return () => {
+            if ((window as any).scrapeTimeoutId) {
+                clearTimeout((window as any).scrapeTimeoutId);
+            }
+        };
+    }, []);  // Empty dependency array means this runs once on mount and cleans up on unmount
 
     // Add a useEffect to set up the scheduled API calls whenever scheduleInfo changes
     useEffect(() => {
@@ -529,6 +543,7 @@ const Index = () => {
                                 console.log('Scraping scheduled:', {
                                     url,
                                     ...scheduleData,
+                                    prompt,
                                     formattedStartDate: scheduleData.startDate.toLocaleString(),
                                 });
 
