@@ -343,11 +343,11 @@ const Index = () => {
 
         // Function to perform the scheduled API call
         const performScheduledApiCall = async () => {
-            console.log(`Executing scheduled condition check for URL: ${url}`);
+            // console.log(`Executing scheduled condition check for URL: ${url}`);
 
             try {
                 // Call the API endpoint instead of handleScrape()
-                const response = await fetch('http://127.0.0.1:8000/check-and-notify', {
+                const response = await fetch('https://web-production-a6bf.up.railway.app/check-and-notify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -360,12 +360,12 @@ const Index = () => {
                 });
 
                 const result = await response.json();
-                console.log('API Response:', result);
+                // console.log('API Response:', result);
 
                 // You could add some user feedback here based on the API response
 
             } catch (error) {
-                console.error('Failed to call check-and-notify API:', error);
+                // console.error('Failed to call check-and-notify API:', error);
             }
 
             // If it's a recurring schedule, set up the next one
@@ -415,7 +415,7 @@ const Index = () => {
                 day: 'numeric'
             });
 
-            console.log(`Scheduled condition check for ${url} on ${formattedDate} at ${scheduleInfo.time}`);
+            // console.log(`Scheduled condition check for ${url} on ${formattedDate} at ${scheduleInfo.time}`);
 
             (window as any).scrapeTimeoutId = setupScheduledScraping(scheduleInfo, url);
         }
@@ -540,12 +540,12 @@ const Index = () => {
 
 
                                 // Log for debugging
-                                console.log('Scraping scheduled:', {
-                                    url,
-                                    ...scheduleData,
-                                    prompt,
-                                    formattedStartDate: scheduleData.startDate.toLocaleString(),
-                                });
+                                // console.log('Scraping scheduled:', {
+                                //     url,
+                                //     ...scheduleData,
+                                //     prompt,
+                                //     formattedStartDate: scheduleData.startDate.toLocaleString(),
+                                // });
 
                                 // Save to localStorage for persistence across page refreshes
                                 if (userId) {
