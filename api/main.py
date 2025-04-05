@@ -11,6 +11,21 @@ from bs4 import BeautifulSoup
 from groq import Groq
 from typing import Optional
 
+from pydantic import BaseModel, EmailStr
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+
+# Email configuration - you should set these as environment variables
+# Email configuration - direct values
+EMAIL_HOST = "smtp.gmail.com"       # Correct for Gmail
+EMAIL_PORT = 587                    # Correct for TLS (STARTTLS)
+EMAIL_USERNAME = "zipletxyz@gmail.com"
+EMAIL_PASSWORD = "cdcx zndl lptd tkqo"  # Should be a valid App Password
+EMAIL_FROM = "zipletxyz@gmail.com"  # Usually same as EMAIL_USERNAME
+
+
 # Set up Groq API client
 client = Groq(api_key="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")
 
@@ -149,3 +164,120 @@ def clear_scraped_content():
 @app.get("/")
 def read_root():
     return {"status": "API is running", "endpoints": ["/scrape", "/chat", "/scrape/status", "/scrape/clear"]}
+
+
+# Model for check and notify request
+class CheckAndNotifyRequest(BaseModel):
+    url: str
+    condition_prompt: str
+    recipient_email: EmailStr
+
+# Function to send email
+def send_email(recipient, subject, body):
+    message = MIMEMultipart()
+    message["From"] = EMAIL_FROM
+    message["To"] = recipient
+    message["Subject"] = subject
+    
+    # Add body to email
+    message.attach(MIMEText(body, "plain"))
+    
+    # Send email
+    with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+        server.starttls()
+        server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
+        server.send_message(message)
+
+# API route to check condition and send notification
+@app.post("/check-and-notify")
+def check_and_notify_endpoint(request: CheckAndNotifyRequest):
+    # First, scrape the website
+    scraped_text = scrape_website(request.url)
+    
+    if not scraped_text:
+        raise HTTPException(status_code=500, detail="Failed to scrape the website")
+    
+    # Limit content size
+    content = scraped_text[:15000]
+    
+    # Build prompt to check condition and generate email
+    prompt = f"""
+Based on the following content scraped from {request.url}, please check if this condition is met:
+"{request.condition_prompt}"
+
+WEBSITE CONTENT:
+{content}
+
+If the condition IS met, respond in this exact format:
+CONDITION_MET: YES
+SUBJECT: [write an informative email subject here]
+BODY: [write a brief email body explaining what was found with specific details]
+
+If the condition is NOT met, respond only with:
+CONDITION_MET: NO
+
+Be very strict about checking the condition. Only return YES if you're certain the condition is truly satisfied.
+"""
+    
+    try:
+        # Call the LLM
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            stream=False,
+        )
+        
+        response = chat_completion.choices[0].message.content
+        
+        # Check if condition was met
+        if "CONDITION_MET: YES" in response:
+            # Extract subject and body
+            import re
+            subject_match = re.search(r"SUBJECT: (.*?)(?:\n|$)", response)
+            body_match = re.search(r"BODY: (.*?)(?:\n|$)", response, re.DOTALL)
+            
+            subject = subject_match.group(1) if subject_match else "Notification: Condition Met"
+            body = body_match.group(1) if body_match else response
+            
+            # Send email notification
+            try:
+                send_email(
+                    recipient=request.recipient_email,
+                    subject=subject,
+                    body=f"""
+Hello,
+
+The condition you set for monitoring {request.url} has been met:
+
+"{request.condition_prompt}"
+
+{body}
+
+This is an automated notification from your website monitoring service.
+                    """
+                )
+                
+                return {
+                    "status": "success",
+                    "condition_met": True,
+                    "message": "Condition met and notification sent"
+                }
+            except Exception as email_error:
+                return {
+                    "status": "partial_success",
+                    "condition_met": True,
+                    "message": f"Condition met but failed to send email: {str(email_error)}",
+                    "email_content": {
+                        "subject": subject,
+                        "body": body
+                    }
+                }
+        else:
+            return {
+                "status": "success",
+                "condition_met": False,
+                "message": "Condition not met, no notification sent"
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking condition: {str(e)}")

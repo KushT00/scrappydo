@@ -43,6 +43,10 @@ const Index = () => {
         startDate: Date;
     } | null>(null);
 
+
+    const [email, setEmail] = useState("");
+    const [prompt, setPromt] = useState("");
+
     // Get the current pathname for workspace name
     const pathname = usePathname();
     const parts = pathname?.split("/") || [];
@@ -334,56 +338,74 @@ const Index = () => {
             return targetDate.getTime() - now.getTime();
         };
 
-        // Function to perform the scheduled scrape
-        const performScheduledScrape = () => {
-            console.log(`Executing scheduled scrape for URL: ${url}`);
-            handleScrape(); // Execute the scrape
+        // Function to perform the scheduled API call
+        const performScheduledApiCall = async () => {
+            console.log(`Executing scheduled condition check for URL: ${url}`);
+
+            try {
+                // Call the API endpoint instead of handleScrape()
+                const response = await fetch('http://127.0.0.1:8000/check-and-notify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        condition_prompt: prompt, // Using the state variable you already set
+                        recipient_email: email,   // Using the state variable you already set
+                    }),
+                });
+
+                const result = await response.json();
+                console.log('API Response:', result);
+
+                // You could add some user feedback here based on the API response
+
+            } catch (error) {
+                console.error('Failed to call check-and-notify API:', error);
+            }
 
             // If it's a recurring schedule, set up the next one
             if (scheduleInfo.frequency !== 'once') {
                 const nextTimeout = calculateTimeUntilNextScrape();
                 if (nextTimeout !== null) {
-                    setTimeout(performScheduledScrape, nextTimeout);
+                    setTimeout(performScheduledApiCall, nextTimeout);
                 }
             }
         };
 
-        // Calculate initial timeout and schedule first scrape
+        // Calculate initial timeout and schedule first API call
         const initialTimeout = calculateTimeUntilNextScrape();
         if (initialTimeout !== null) {
             // Store the timeout ID to clear it if needed
-            const timeoutId = setTimeout(performScheduledScrape, initialTimeout);
+            const timeoutId = setTimeout(performScheduledApiCall, initialTimeout);
             return timeoutId;
         }
 
         return null;
     };
 
-
-    // Add a useEffect to set up the scheduled scraping whenever scheduleInfo changes
+    // Add a useEffect to set up the scheduled API calls whenever scheduleInfo changes
     useEffect(() => {
         // Clear any existing timeout to avoid duplicate schedules
-        if (window.scrapeTimeoutId) {
-            clearTimeout(window.scrapeTimeoutId);
+        if ((window as any).scrapeTimeoutId) {
+            clearTimeout((window as any).scrapeTimeoutId);
         }
 
         // Set up the new schedule if we have the necessary info
-        if (scheduleInfo && url) {
-            // Format the scheduled time for user feedback
-            const formattedDate = scheduleInfo.startDate.toLocaleDateString('en-US', {
+        if (scheduleInfo && url && email && prompt) {  // Added checks for email and prompt
+            // You might want to add some visual feedback to the user about the scheduled check
+            const formattedDate = new Date(scheduleInfo.startDate).toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric'
             });
 
-           
-            if ((window as any).scrapeTimeoutId) {
-                clearTimeout((window as any).scrapeTimeoutId);
-            }
+            console.log(`Scheduled condition check for ${url} on ${formattedDate} at ${scheduleInfo.time}`);
+
             (window as any).scrapeTimeoutId = setupScheduledScraping(scheduleInfo, url);
-            
         }
-    }, [scheduleInfo, url]);
+    }, [scheduleInfo, url, email, prompt]);  // Added email and prompt as dependencies
 
     // Add this effect to restore schedules from localStorage when the component mounts
     useEffect(() => {
@@ -600,6 +622,8 @@ const Index = () => {
                             <EmailTrigger
                                 onTriggerSetup={(triggerConfig) => {
                                     console.log('Email Trigger Configured:', triggerConfig);
+                                    setEmail(triggerConfig.email)
+                                    setPromt(triggerConfig.prompt)
                                 }}
                             />
                             {scheduleInfo && (
