@@ -7,4 +7,3 @@ pydantic
 python-multipart
 email-validator
 webdriver-manager
-smtplib
