@@ -80,7 +80,7 @@ const Index = () => {
     useEffect(() => {
         const checkScrapeStatus = async () => {
             try {
-                const response = await fetch("https://web-production-a6bf.up.railway.app/scrape/status");
+                const response = await fetch("http://localhost:8000/scrape/status");
                 const data = await response.json();
                 setIsScraped(data.has_content);
 
@@ -183,7 +183,7 @@ const Index = () => {
             const savedToStorage = await saveUrlToStorage(url);
 
             // Proceed with scraping
-            const response = await fetch("https://web-production-a6bf.up.railway.app/scrape", {
+            const response = await fetch("http://localhost:8000/scrape", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url }),
@@ -238,7 +238,7 @@ const Index = () => {
         setLoading(true);
 
         try {
-            const response = await fetch("https://web-production-a6bf.up.railway.app/chat", {
+            const response = await fetch("http://localhost:8000/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -263,7 +263,7 @@ const Index = () => {
 
     const handleClearContent = async () => {
         try {
-            await fetch("https://web-production-a6bf.up.railway.app/scrape/clear", {
+            await fetch("http://localhost:8000/scrape/clear", {
                 method: "POST"
             });
             setIsScraped(false);
