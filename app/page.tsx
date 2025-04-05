@@ -6,20 +6,23 @@ import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useRouter } from "next/navigation"
 import Header from "@/components/ui/header"
+
+// API base URL - update this to your FastAPI server URL
+const API_BASE_URL = "https://web-production-a6bf.up.railway.app"
 
 export default function Home() {
   const router = useRouter()
   const [workspaces, setWorkspaces] = useState<string[]>([])
+  const [url, setUrl] = useState("")
+  const [description, setDescription] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([])
+  const [scraped, setScraped] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
 
   useEffect(() => {
     // Load theme
@@ -34,37 +37,89 @@ export default function Home() {
     setWorkspaces(savedWorkspaces)
   }, [])
 
- 
-  const [url, setUrl] = useState("")
-  const [description, setDescription] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState<{ product: string; price: string }[]>([])
-  const [isDarkMode, setIsDarkMode] = useState(false)
-
-  // Load theme preference from localStorage
-  useEffect(() => {
-    const theme = localStorage.getItem("theme")
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark")
-      setIsDarkMode(true)
-    }
-  }, [])
-
-  // Toggle theme function
-
   const handleScrape = async () => {
+    if (!url) {
+      alert("Please enter a URL to scrape")
+      return
+    }
+    
+    if (!description) {
+      alert("Please describe what you want to extract")
+      return
+    }
+    
     setLoading(true)
-    // Simulated API call - replace with actual implementation
-    setTimeout(() => {
-      setResults([
-        { product: "Rev 1.0 Utility Waist Pouch (Deep Blue)", price: "₹250" },
-        { product: "Rev 1.0 Utility Waist Pouch (Nardo Grey)", price: "₹250" },
-        { product: "Flying Weebee", price: "₹420" },
-        { product: "Myth of Asia", price: "₹420" },
-        { product: "WIZMAN X SEEDSTORE (PACK OF 3)", price: "₹1,111" },
-      ])
+    
+    
+    
+    try {
+      // First call the scrape endpoint
+      const scrapeResponse = await fetch(`${API_BASE_URL}/scrape`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      })
+      
+      const scrapeData = await scrapeResponse.json()
+      
+      if (scrapeResponse.ok) {
+        setScraped(true)
+        
+        // Modified: Add system message about successful scraping
+        setChatMessages(prev => [...prev, {
+          role: "system",
+          content: `Website scraped successfully. Analyzing data...`
+        }])
+        
+        // Then call the chat endpoint with the user's prompt
+        const chatResponse = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_prompt: `${description}. If you find products with names and prices, format them as a markdown table with columns for Product Name and Price.`,
+            use_scraped_content: true
+          }),
+        })
+        
+        const chatData = await chatResponse.json()
+        
+        if (chatResponse.ok) {
+          // Add assistant message with formatted response
+          setChatMessages(prev => [...prev, {
+            role: "assistant",
+            content: chatData.response
+          }])
+        } else {
+          setChatMessages(prev => [...prev, {
+            role: "assistant",
+            content: `Error: ${chatData.detail || "Failed to get AI response"}`
+          }])
+        }
+      } else {
+        setChatMessages(prev => [...prev, {
+          role: "assistant",
+          content: `Error: ${scrapeData.detail || "Failed to scrape website"}`
+        }])
+      }
+    } catch (error) {
+      console.error("API call failed:", error)
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        content: "Error: Could not connect to server"
+      }])
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
+  }
+
+  // Clear chat messages
+  const handleClear = () => {
+    setChatMessages([])
+    setScraped(false)
   }
 
   return (
@@ -77,8 +132,7 @@ export default function Home() {
       </div>
 
       {/* Header */}
-      <Header/>
-
+      <Header />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-3xl relative">
@@ -119,34 +173,50 @@ export default function Home() {
               />
             </div>
 
-            <Button 
-              className="w-full bg-primary/90 hover:bg-primary/100 backdrop-blur-sm"
-              onClick={handleScrape}
-              disabled={loading}
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {loading ? "Scraping..." : "Scrape Website"}
-            </Button>
+            <div className="flex space-x-3">
+              <Button 
+                className="flex-1 bg-primary/90 hover:bg-primary/100 backdrop-blur-sm"
+                onClick={handleScrape}
+                disabled={loading || !url || !description}
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? "Processing..." : "Scrape & Analyze"}
+              </Button>
+              
+              {chatMessages.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={handleClear}
+                  className="backdrop-blur-sm"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
 
-          {results.length > 0 && (
-            <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-md shadow-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-primary/5">
-                    <TableHead>Product Name</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.map((item, index) => (
-                    <TableRow key={index} className="hover:bg-primary/5">
-                      <TableCell>{item.product}</TableCell>
-                      <TableCell className="text-right">{item.price}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          {chatMessages.length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-md shadow-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Analysis Results</h2>
+              <div className="space-y-4">
+                {chatMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`${message.role === "user"
+                      ? "ml-auto bg-primary/20 backdrop-blur-md"
+                      : message.role === "system"
+                        ? "mx-auto bg-muted/50 backdrop-blur-md text-center"
+                        : "mr-auto bg-card backdrop-blur-md border border-border/50"
+                      } p-4 rounded-xl max-w-[95%] w-full`}
+                  >
+                    <div className="overflow-auto prose dark:prose-invert prose-sm max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
